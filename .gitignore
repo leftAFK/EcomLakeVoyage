@@ -1,0 +1,59 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# Compiled source
+*.pyc
+*.pyo
+__pycache__/
+
+# Docker data volumes and generated files
+docker/paimon_warehouse/
+docker/doris/be/log/
+docker/doris/be/data/
+docker/doris/fe/log/
+docker/doris/fe/meta/
+docker/doris/fe/audit_log/
+docker/doris/fe/dump/
+docker/clickhouse/data/
+docker/mysql/data/
+docker/flink-1.20.0/paimon_warehouse/
+docker/flink-1.20.0/flink-checkpoints/
+docker/flink-1.20.0/flink-savepoints/
+
+# Virtual environments
+venv/
+venv11/
+.venv
+
+# Log files
+*.log
+
+# Backup files
+*.bak
+*.tmp
+
+# Large binary files
+*.tgz
+*.tar.gz
+*.jar
+hive/
+hadoop/
+hadoop-3.1.4/
+spark/
+flink-1.20.0/
+flink-1.20.0-bin-scala_2.12.tgz
+mysql-connector-java-*.jar
+
+# Docker containers data
+docker/monitoring/prometheus/data/
+
+# Python cache
+__pycache__/
