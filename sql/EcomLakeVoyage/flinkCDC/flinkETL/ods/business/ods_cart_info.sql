@@ -1,0 +1,106 @@
+-- ============================================================
+-- ODS CDC 实时同步 - cart_info（购物车表）
+-- 流模式，INSERT INTO 持续同步
+-- changelog-producer=input，dt 分区，PK=(id, dt)
+-- ============================================================
+-- docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh -f /opt/flink/sql/EcomLakeVoyage/flinkCDC/flinkETL/ods/business/ods_cart_info.sql
+
+
+-- ========== 环境配置 ==========
+SET 'execution.checkpointing.interval' = '10s';
+SET 'execution.checkpointing.mode' = 'EXACTLY_ONCE';
+SET 'execution.checkpointing.timeout' = '10min';
+SET 'execution.checkpointing.min-pause' = '30s';
+SET 'execution.checkpointing.max-concurrent-checkpoints' = '1';
+SET 'execution.checkpointing.externalized-checkpoint-retention' = 'RETAIN_ON_CANCELLATION';
+SET 'execution.checkpointing.tolerable-failed-checkpoints' = '3';
+SET 'state.backend' = 'hashmap';
+SET 'state.checkpoints.dir' = 'file:///opt/flink/paimon_warehouse/flink-checkpoints';
+SET 'state.savepoints.dir' = 'file:///opt/flink/paimon_warehouse/flink-savepoints';
+SET 'restart-strategy' = 'failure-rate';
+SET 'restart-strategy.failure-rate.max-failures-per-interval' = '3';
+SET 'restart-strategy.failure-rate.failure-rate-interval' = '10min';
+SET 'restart-strategy.failure-rate.delay' = '30s';
+SET 'parallelism.default' = '1';
+SET 'table.exec.state.ttl' = '24h';
+SET 'table.local-time-zone' = 'Asia/Shanghai';
+SET 'execution.runtime-mode' = 'streaming';
+
+-- ========== Paimon Catalog ==========
+CREATE CATALOG paimon WITH (
+    'type' = 'paimon',
+    'warehouse' = 'file:///opt/flink/paimon_warehouse'
+);
+USE CATALOG paimon;
+CREATE DATABASE IF NOT EXISTS ods;
+
+-- ========== MySQL CDC Source ==========
+CREATE TEMPORARY TABLE mysql_cart_info (
+    id           BIGINT,
+    user_id      BIGINT,
+    sku_id       BIGINT,
+    sku_name     STRING,
+    category_id  BIGINT,
+    cart_price   DECIMAL(18,2),
+    sku_num      INT,
+    img_url      STRING,
+    sku_attr     STRING,
+    order_id     BIGINT,
+    is_checked   BOOLEAN,
+    create_time  TIMESTAMP(3),
+    operate_time TIMESTAMP(3),
+    update_time  TIMESTAMP(3),
+    PRIMARY KEY (id) NOT ENFORCED
+) WITH (
+    'connector' = 'mysql-cdc',
+    'hostname' = 'mysql',
+    'port' = '3306',
+    'username' = 'root',
+    'password' = '123456',
+    'database-name' = 'gmall_business',
+    'table-name' = 'cart_info',
+    'server-id' = '5521-5531',
+    'server-time-zone' = 'Asia/Shanghai',
+    -- 'scan.startup.mode' = 'initial'
+    'scan.startup.mode' = 'latest-offset'
+);
+
+-- ========== Paimon Target ==========
+CREATE TABLE IF NOT EXISTS ods.cart_info (
+    id           BIGINT,
+    user_id      BIGINT,
+    sku_id       BIGINT,
+    sku_name     STRING,
+    category_id  BIGINT,
+    cart_price   DECIMAL(18,2),
+    sku_num      INT,
+    img_url      STRING,
+    sku_attr     STRING,
+    order_id     BIGINT,
+    is_checked   BOOLEAN,
+    create_time  TIMESTAMP(3),
+    operate_time TIMESTAMP(3),
+    update_time     TIMESTAMP(3),
+    dt              STRING,
+    WATERMARK FOR create_time AS create_time - INTERVAL '5' SECOND,
+    PRIMARY KEY (id, dt) NOT ENFORCED
+) PARTITIONED BY (dt) WITH (
+    'changelog-producer' = 'input',
+    'merge-engine' = 'deduplicate',
+    'bucket' = '4',
+    'target-file-size' = '128mb',
+    'snapshot.time-retained' = '7d',
+    'snapshot.num-retained.min' = '10',
+    'snapshot.num-retained.max' = '20',
+    'changelog.time-retained' = '7d',
+    'file.format' = 'orc',
+    'orc.compression' = 'zstd'
+);
+
+-- ========== 同步作业 ==========
+INSERT INTO ods.cart_info
+SELECT id, user_id, sku_id, sku_name, category_id, cart_price,
+       sku_num, img_url, sku_attr, order_id, is_checked,
+       create_time, operate_time, update_time,
+       DATE_FORMAT(create_time, 'yyyy-MM-dd') AS dt
+FROM mysql_cart_info;

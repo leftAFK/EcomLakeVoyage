@@ -1,0 +1,21 @@
+# Docker data
+mysql/data/
+clickhouse/data/
+doris/be/storage/
+doris/fe/doris-meta/
+paimon_warehouse/
+iceberg_warehouse/
+# Logs
+*.log
+doris/be/log/
+doris/fe/log/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Temp files
+*.tmp
+*.bak
