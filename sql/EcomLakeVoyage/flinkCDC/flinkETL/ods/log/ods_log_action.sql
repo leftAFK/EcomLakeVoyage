@@ -1,0 +1,88 @@
+-- ============================================================
+-- ODS 日志同步 - 动作日志（Action Log）
+-- 流模式，Kafka JSON → Paimon append-only（无主键，无 changelog-producer）
+-- dt 分区，基于 create_time
+-- ============================================================
+-- docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh -f /opt/flink/sql/EcomLakeVoyage/flinkCDC/flinkETL/ods/log/ods_log_action.sql
+-- ============================================================
+
+-- ========== 环境配置 ==========
+SET 'execution.checkpointing.interval' = '10s';
+SET 'execution.checkpointing.mode' = 'EXACTLY_ONCE';
+SET 'execution.checkpointing.timeout' = '10min';
+SET 'execution.checkpointing.min-pause' = '30s';
+SET 'execution.checkpointing.max-concurrent-checkpoints' = '1';
+SET 'execution.checkpointing.externalized-checkpoint-retention' = 'RETAIN_ON_CANCELLATION';
+SET 'execution.checkpointing.tolerable-failed-checkpoints' = '3';
+SET 'state.backend' = 'hashmap';
+SET 'state.checkpoints.dir' = 'file:///opt/flink/paimon_warehouse/flink-checkpoints';
+SET 'state.savepoints.dir' = 'file:///opt/flink/paimon_warehouse/flink-savepoints';
+SET 'restart-strategy' = 'failure-rate';
+SET 'restart-strategy.failure-rate.max-failures-per-interval' = '3';
+SET 'restart-strategy.failure-rate.failure-rate-interval' = '10min';
+SET 'restart-strategy.failure-rate.delay' = '30s';
+SET 'parallelism.default' = '1';
+SET 'table.exec.state.ttl' = '24h';
+SET 'table.local-time-zone' = 'Asia/Shanghai';
+SET 'execution.runtime-mode' = 'streaming';
+
+-- ========== Paimon Catalog ==========
+CREATE CATALOG paimon WITH (
+    'type' = 'paimon',
+    'warehouse' = 'file:///opt/flink/paimon_warehouse'
+);
+USE CATALOG paimon;
+CREATE DATABASE IF NOT EXISTS ods;
+
+-- ========== Kafka Source ==========
+CREATE TEMPORARY TABLE kafka_log_action (
+    mid             STRING,
+    user_id         BIGINT,
+    item_type       STRING,
+    item_id         STRING,
+    target_page_id  STRING,
+    create_time     TIMESTAMP(3),
+    proctime AS PROCTIME()
+) WITH (
+    'connector' = 'kafka',
+    'topic' = 'ods_log_action',
+    'properties.bootstrap.servers' = 'kafka:9092',
+    'properties.group.id' = 'flink_ods_log_action',
+    'scan.startup.mode' = 'group-offsets',
+    'properties.auto.offset.reset' = 'earliest',
+    'format' = 'json',
+    'json.fail-on-missing-field' = 'false',
+    'json.ignore-parse-errors' = 'true'
+);
+
+-- ========== Paimon ODS Target（append-only，无主键） ==========
+CREATE TABLE IF NOT EXISTS ods.log_action (
+    mid             STRING,
+    user_id         BIGINT,
+    item_type       STRING,
+    item_id         STRING,
+    target_page_id  STRING,
+    create_time     TIMESTAMP(3),
+    dt              STRING
+) PARTITIONED BY (dt) WITH (
+    'bucket' = '4',
+    'bucket-key' = 'mid',
+    'target-file-size' = '128mb',
+    'snapshot.time-retained' = '7d',
+    'snapshot.num-retained.min' = '10',
+    'snapshot.num-retained.max' = '20',
+    'file.format' = 'orc',
+    'orc.compression' = 'zstd'
+);
+
+-- ========== 同步作业 ==========
+INSERT INTO ods.log_action
+SELECT
+    mid,
+    user_id,
+    item_type,
+    item_id,
+    target_page_id,
+    create_time,
+    DATE_FORMAT(create_time, 'yyyy-MM-dd') AS dt
+FROM kafka_log_action;
