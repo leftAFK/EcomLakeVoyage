@@ -361,7 +361,7 @@ ORDER BY rn ASC;
 
 ### 环境变量
 
-在 [docker-compose.yml](file:///Users/ok/bigdata/docker/docker-compose.yml) 中可配置的核心环境变量：
+在 [docker-compose.yml](docker/docker-compose.yml) 中可配置的核心环境变量：
 
 | 变量名 | 默认值 | 说明 | 所属服务 |
 |--------|--------|------|----------|
@@ -539,10 +539,10 @@ sql/EcomLakeVoyage/flinkCDC/flinkETL/
 
 | 编号 | 看板名称 | 文件 | 核心指标 |
 |------|----------|------|----------|
-| 01 | 📈 交易总览大屏 | [01-trading-overview.json](file:///Users/ok/bigdata/docker/monitoring/grafana/dashboards/01-trading-overview.json) | 今日 GMV / 订单数 / 支付转化率 / 退款率 / 客单价 / 小时级趋势 |
-| 02 | 🛍️ 商品分析 | [02-product-analysis.json](file:///Users/ok/bigdata/docker/monitoring/grafana/dashboards/02-product-analysis.json) | TOP SKU / TOP 品牌 / 品类占比 / 7 日均线 / 异常预警 |
-| 03 | 🚦 流量漏斗 | [03-traffic-funnel.json](file:///Users/ok/bigdata/docker/monitoring/grafana/dashboards/03-traffic-funnel.json) | 浏览→加购→下单→支付 转化率 / 热门路径 TOP10 / 跳出率 |
-| 04 | 🗺️ 用户地区分布 | [04-user-region.json](file:///Users/ok/bigdata/docker/monitoring/grafana/dashboards/04-user-region.json) | 省份热力 / 大区对比 / 城市排行 / 地区客单价差异 |
+| 01 | 📈 交易总览大屏 | [01-trading-overview.json](docker/monitoring/grafana/dashboards/01-trading-overview.json) | 今日 GMV / 订单数 / 支付金额 / 支付转化率 / 退款率 / 净支付金额 / 小时级趋势 / 优惠券核销 |
+| 02 | 🛍️ 商品分析 | [02-product-analysis.json](docker/monitoring/grafana/dashboards/02-product-analysis.json) | TOP SKU / TOP 品牌 / 品类占比 / 优惠券抵扣 / 品类销售趋势 / SKU 异常预警 |
+| 03 | 🚦 流量漏斗 | [03-traffic-funnel.json](docker/monitoring/grafana/dashboards/03-traffic-funnel.json) | PV / UV / 浏览→动作→加购→支付 漏斗 / 跳出率 / 曝光排行 / 活跃排行 / 错误日志 / 热门路径 TOP10 / 页面排行 |
+| 04 | 🗺️ 用户地区分布 | [04-user-region.json](docker/monitoring/grafana/dashboards/04-user-region.json) | RFM 分群 / 大区交易额 / 省份排名 / 用户交易排名 TOP20 / RFM 分层汇总 / 浏览留存 / 购买留存 / 用户等级分布 |
 
 ### 效果展示
 
@@ -572,7 +572,7 @@ sql/EcomLakeVoyage/flinkCDC/flinkETL/
 
 ### Prometheus 采集目标
 
-见 [prometheus.yml](file:///Users/ok/bigdata/docker/monitoring/prometheus/prometheus.yml)：
+见 [prometheus.yml](docker/monitoring/prometheus/prometheus.yml)：
 
 | Job | Target | Metrics 端口 |
 |-----|--------|--------------|

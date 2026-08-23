@@ -828,6 +828,161 @@
       ],
       "title": "SKU销量TOP20",
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "doris"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 15,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "doris"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT UNIX_TIMESTAMP(dt)*1000 AS time, total_amount AS '销售额', amount_pct AS '占比%' FROM ads.category_sales_trend WHERE category1_name = (SELECT category1_name FROM ads.category_sales_trend WHERE dt = (SELECT MAX(dt) FROM ads.category_sales_trend) ORDER BY total_amount DESC LIMIT 1) AND total_amount > 0 ORDER BY dt DESC LIMIT 30",
+          "refId": "A"
+        }
+      ],
+      "title": "一级品类销售趋势",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "doris"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "当日销量"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "7日均值"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "偏差%"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "doris"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT dt AS '日期', sku_name AS '商品名称', brand_name AS '品牌', category1_name AS '分类', anomaly_type AS '异常类型', order_count AS '当日销量', ROUND(avg_7d_order_count,1) AS '7日均值', deviation_rate AS '偏差%' FROM ads.sku_sales_anomaly WHERE dt = (SELECT MAX(dt) FROM ads.sku_sales_anomaly) ORDER BY ABS(deviation_rate) DESC LIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "SKU销量异常预警TOP20",
+      "type": "table"
     }
   ],
   "refresh": "30s",

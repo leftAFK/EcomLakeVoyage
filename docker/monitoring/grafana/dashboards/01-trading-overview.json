@@ -39,7 +39,7 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 3,
         "x": 0,
         "y": 0
       },
@@ -68,7 +68,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT total_gmv FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT MAX(dt) FROM ads.gmv_realtime_dashboard WHERE total_gmv > 0 OR total_order_count > 0)",
+          "rawSql": "SELECT total_gmv FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT latest_stat_dt FROM ads.latest_business_dt)",
           "refId": "A"
         }
       ],
@@ -91,8 +91,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 3,
+        "x": 3,
         "y": 0
       },
       "id": 2,
@@ -120,7 +120,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT total_order_count FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT MAX(dt) FROM ads.gmv_realtime_dashboard WHERE total_gmv > 0 OR total_order_count > 0)",
+          "rawSql": "SELECT total_order_count FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT latest_stat_dt FROM ads.latest_business_dt)",
           "refId": "A"
         }
       ],
@@ -143,8 +143,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 8,
+        "w": 3,
+        "x": 6,
         "y": 0
       },
       "id": 3,
@@ -172,7 +172,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT total_payment_amount FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT MAX(dt) FROM ads.gmv_realtime_dashboard WHERE total_gmv > 0 OR total_order_count > 0)",
+          "rawSql": "SELECT total_payment_amount FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT latest_stat_dt FROM ads.latest_business_dt)",
           "refId": "A"
         }
       ],
@@ -194,8 +194,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 3,
+        "x": 9,
         "y": 0
       },
       "id": 4,
@@ -223,7 +223,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT CONCAT(payment_conversion_rate, '%') FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT MAX(dt) FROM ads.gmv_realtime_dashboard WHERE total_gmv > 0 OR total_order_count > 0)",
+          "rawSql": "SELECT CONCAT(payment_conversion_rate, '%') FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT latest_stat_dt FROM ads.latest_business_dt)",
           "refId": "A"
         }
       ],
@@ -246,8 +246,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 16,
+        "w": 3,
+        "x": 12,
         "y": 0
       },
       "id": 5,
@@ -275,7 +275,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT avg_order_amount FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT MAX(dt) FROM ads.gmv_realtime_dashboard WHERE total_gmv > 0 OR total_order_count > 0)",
+          "rawSql": "SELECT avg_order_amount FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT latest_stat_dt FROM ads.latest_business_dt)",
           "refId": "A"
         }
       ],
@@ -297,8 +297,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 20,
+        "w": 3,
+        "x": 15,
         "y": 0
       },
       "id": 6,
@@ -326,7 +326,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT CONCAT(refund_rate, '%') FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT MAX(dt) FROM ads.gmv_realtime_dashboard WHERE total_gmv > 0 OR total_order_count > 0)",
+          "rawSql": "SELECT CONCAT(refund_rate, '%') FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT latest_stat_dt FROM ads.latest_business_dt)",
           "refId": "A"
         }
       ],
@@ -533,7 +533,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT CONCAT(coupon_usage_rate, '%') AS \"优惠券使用率\", total_coupon_count AS \"领券数\", total_coupon_reduce_amount AS \"优惠金额\" FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT MAX(dt) FROM ads.gmv_realtime_dashboard WHERE total_gmv > 0 OR total_order_count > 0)",
+          "rawSql": "SELECT CONCAT(coupon_usage_rate, '%') AS \"优惠券使用率\", total_coupon_count AS \"领券数\", total_coupon_reduce_amount AS \"优惠金额\" FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT latest_stat_dt FROM ads.latest_business_dt)",
           "refId": "A"
         }
       ],
@@ -640,6 +640,305 @@
       ],
       "title": "每日交易明细",
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "doris"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 15,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "doris"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT UNIX_TIMESTAMP(CONCAT(dt,' ',hour,':00:00'))*1000 AS time, gmv AS 'GMV', cumulative_gmv AS '累计GMV' FROM ads.gmv_hourly_trend WHERE dt = (SELECT MAX(dt) FROM ads.gmv_hourly_trend WHERE gmv > 0) ORDER BY hour",
+          "refId": "A"
+        }
+      ],
+      "title": "GMV小时级趋势",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "doris"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "满减金额"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "优惠金额"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "核销次数"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 12,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "优惠金额"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "doris"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT coupon_name AS '优惠券名称', coupon_type AS '类型', full_amount AS '满额门槛', reduce_amount AS '满减金额', coupon_count AS '核销次数', coupon_reduce_amount AS '优惠金额' FROM ads.coupon_analysis WHERE dt = (SELECT MAX(dt) FROM ads.coupon_analysis WHERE coupon_count > 0) ORDER BY coupon_reduce_amount DESC LIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "优惠券核销明细TOP20",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "doris"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "textAlign": "center"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "currency"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 18,
+        "y": 0
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "doris"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT net_payment_amount FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT latest_stat_dt FROM ads.latest_business_dt)",
+          "refId": "A"
+        }
+      ],
+      "title": "今日净支付金额",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "doris"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "textAlign": "center"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 21,
+        "y": 0
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "doris"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CONCAT(refund_amount_rate, '%') FROM ads.gmv_realtime_dashboard WHERE dt = (SELECT latest_stat_dt FROM ads.latest_business_dt)",
+          "refId": "A"
+        }
+      ],
+      "title": "退款金额占支付",
+      "type": "stat"
     }
   ],
   "refresh": "10s",
