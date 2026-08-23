@@ -37,38 +37,143 @@
 ## 架构总览
 
 ```
-┌──────────────┐     CDC      ┌──────────────┐   Lookup Join   ┌──────────────┐
-│   MySQL 8.0  │─────────────▶│  Paimon ODS  │────────────────▶│  Paimon DWD  │
-│ (业务/维度库) │              │  (湖存储)     │                 │  (事实宽表)   │
-└──────────────┘              └──────────────┘                 └──────┬───────┘
-                                                                      │
-┌──────────────┐   Append-Only  ┌──────────────┐                      │
-│  Kafka 3.9   │───────────────▶│ Paimon ODS   │                      │
-│  (日志流)    │                │ (Log 层)      │                      │
-└──────────────┘                └──────────────┘                      │
-                                                                      ▼
-                              ┌─────────────────────────────────────────────────┐
-                              │              Flink 1.20 聚合引擎                 │
-                              │  (流式 ETL / Window / GROUP BY / JOIN)          │
-                              └──────────────────────┬──────────────────────────┘
-                                                     │ Stream Load
-                                                     ▼
-                              ┌─────────────────────────────────────────────────┐
-                              │         Doris 3.1.3 OLAP 引擎                    │
-                              │  DWS (汇总表 + 物化视图 MV) → ADS (分析视图)     │
-                              └──────────────────────┬──────────────────────────┘
-                                                     │ MySQL 协议
-                                                     ▼
-                              ┌─────────────────────────────────────────────────┐
-                              │   Grafana 11.2.0 可视化大屏 (4 块预设看板)        │
-                              │   Prometheus 2.54 指标采集 (Flink/Doris/Host)    │
-                              └─────────────────────────────────────────────────┘
+                                                                   ┌──────────────────────────────────────────────────────────┐
+                                                                   │                    数据调度 (Flink 作业)                    │
+                                                                   │   ┌───────────────┐              ┌─────────────────────┐   │
+                                                                   │   │  Flink CDC 流  │              │ Flink Streaming ETL │   │
+                                                                   │   │  (latest-offset│              │ (Window / GROUP BY  │   │
+                                                                   │   │   / initial)   │              │  / Lookup Join)     │   │
+                                                                   │   └───────┬───────┘              └──────────┬──────────┘   │
+                                                                   │           │                                │              │
+                                                                   │   ┌───────┴───────┐              ┌──────────┴──────────┐   │
+                                                                   │   │ Flink Kafka   │              │ Flink Stream Load   │   │
+                                                                   │   │ (定时批+流)    │              │ → Doris FE/BE       │   │
+                                                                   │   └───────────────┘              └─────────────────────┘   │
+                                                                   └──────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────┐                                    │                                    │
+│          数据源 Data Sources         │                                    ▼                                    ▼
+│                                                                   ┌───────────────────┐          ┌─────────────────────┐
+│  ┌─────────────┐   Debezium CDC    │ Flink MySQL CDC Source        │                   │          │                     │
+│  │  MySQL 8.0  │ ────────────────────────────────────────────────▶│   Paimon ODS      │          │   Paimon DIM        │
+│  │ (业务/维度库) │                    Binlog Changelog             │  (业务 Changelog) │─────────▶│  (维度拉链表)       │
+│  │ gmall_base  │ (topic: dbserver1.*) Primary Key Lookup Join     │  - user_info      │          │  - sku_info         │
+│  │ gmall_business│──────────────────────────────────────────────┐ │  - order_info     │          │  - base_province    │
+│  └─────────────┘                                                 │ │  - order_detail   │          │  - base_category3   │
+│                                                                  │ │  - payment_info   │          │  - base_trademark   │
+│  ┌─────────────┐           Flink Kafka Source (批+流)            │ │  - refund_info    │          │  - user_level       │
+│  │  Kafka 3.9  │─────────────────────────────────────────────────┘ │  - cart_info      │          └──────────┬──────────┘
+│  │  (埋点日志)  │ topic_base_log / topic_action /                  │  - coupon_use     │                     │ Lookup Join
+│  │  topic_start│ topic_error / topic_exposure  Append-Only        │                   │                     ▼
+│  └─────────────┘                                                  └─────────┬─────────┘          ┌─────────────────────┐
+└─────────────────────────────────────┘                                    │                    │   Paimon DWD        │
+                                                                           │────────────────────│  (明细宽表层)       │
+                                                                           ▼                    │                     │
+                                                                   ┌───────────────────┐          │ 交易域 dwd_trade_* │
+                                                                   │   Paimon ODS      │          │ 日志域 dwd_log_*   │
+                                                                   │  (日志 Append)    │          │                     │
+                                                                   │  - log_page_view  │          └──────────┬──────────┘
+                                                                   │  - log_action     │                     │
+                                                                   │  - log_startup    │                     │ Flink 聚合
+                                                                   │  - log_error      │                     │ (DSL 层)
+                                                                   │  - log_exposure   │                     ▼
+                                                                   └─────────┬─────────┘          ┌───────────────────────────────────┐
+                                                                             │                    │                                   │
+                                                                             └───────────────────▶│     Doris 3.1.3 OLAP 引擎        │
+                                                                                                  │                                   │
+                                                                                                  │ ┌─────────────────────────────┐ │
+                                                                                                  │ │  数据写入方式 ②选①           │ │
+                                                                                                  │ │                             │ │
+                                                                                                  │ │  ①  Flink Stream Load       │ │
+                                                                                                  │ │     (Flink → HTTP FE:8030)  │ │
+                                                                                                  │ │     → DWS 明细表            │ │
+                                                                                                  │ │     dws.trade_user_stats    │ │
+                                                                                                  │ │     dws.trade_sku_stats     │ │
+                                                                                                  │ │     dws.log_page_stats...   │ │
+                                                                                                  │ │                             │ │
+                                                                                                  │ │  ②  Doris 外部表直读 Paimon │ │
+                                                                                                  │ │     (Doris Multi-Catalog)   │ │
+                                                                                                  │ │     Paimon DWD/ODS → MV    │ │
+                                                                                                  │ │     dws.trade_region_stats_mv││
+                                                                                                  │ │     dws.trade_coupon_stats_mv││
+                                                                                                  │ │     dws.gmv_hourly_trend_mv │ │
+                                                                                                  │ │     dws.daily_active_users_mv││
+                                                                                                  │ │     dws.daily_order_users_mv ││
+                                                                                                  │ │     dws.page_transition_stats││
+                                                                                                  │ └──────────────┬──────────────┘ │
+                                                                                                  │                │                │
+                                                                                                  │                ▼                │
+                                                                                                  │ ┌─────────────────────────────┐ │
+                                                                                                  │ │   DWS 层 = 明细宽表 + MV     │ │
+                                                                                                  │ │                             │ │
+                                                                                                  │ │   DWS → ADS 全是普通视图    │ │
+                                                                                                  │ │   (查询时即时计算、零存储)   │ │
+                                                                                                  │ └──────────────┬──────────────┘ │
+                                                                                                  │                ▼                │
+                                                                                                  │ ┌─────────────────────────────┐ │
+                                                                                                  │ │ ADS 应用层分析视图           │ │
+                                                                                                  │ │ gmv_realtime_dashboard      │ │
+                                                                                                  │ │ daily_trade_overview        │ │
+                                                                                                  │ │ region_trade_overview       │ │
+                                                                                                  │ │ category1_sales_summary     │ │
+                                                                                                  │ │ brand_sales_summary         │ │
+                                                                                                  │ │ sku_sales_ranking           │ │
+                                                                                                  │ │ coupon_analysis             │ │
+                                                                                                  │ │ category_sales_trend        │ │
+                                                                                                  │ │ sku_sales_anomaly           │ │
+                                                                                                  │ │ rfm_user_segmentation       │ │
+                                                                                                  │ │ rfm_segment_summary         │ │
+                                                                                                  │ │ log_traffic_overview        │ │
+                                                                                                  │ │ log_page_ranking            │ │
+                                                                                                  │ │ log_user_activity_ranking   │ │
+                                                                                                  │ │ log_error_analysis          │ │
+                                                                                                  │ │ page_transition_matrix      │ │
+                                                                                                  │ │ user_path_top10             │ │
+                                                                                                  │ │ user_browse_retention       │ │
+                                                                                                  │ │ user_purchase_retention     │ │
+                                                                                                  │ │ log_funnel_analysis         │ │
+                                                                                                  │ │ log_sku_exposure_ranking    │ │
+                                                                                                  │ │ latest_business_dt          │ │
+                                                                                                  │ └──────────────┬──────────────┘ │
+                                                                                                  └────────────────┬────────────────┘
+                                                                                                                   │ MySQL 协议 (FE:9030)
+                                                                                                                   ▼
+                                                                                              ┌──────────────────────────────────────────┐
+                                                                                              │       Grafana 11.2.0 可视化层             │
+                                                                                              │                                          │
+                                                                                              │  📈 交易总览大屏   (14 panels)           │
+                                                                                              │  🛍️ 商品分析大屏   (8 panels)            │
+                                                                                              │  🚦 流量漏斗大屏   (14 panels)           │
+                                                                                              │  🗺️ 用户地区分布   (10 panels)           │
+                                                                                              │                                          │
+                                                                                              └───────────────────────┬──────────────────┘
+                                                                                                                      │
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐│
+│              Prometheus 2.54 指标采集层                                                      ▼                   │
+│                                                                                                                   │
+│  ┌────────────┐   /metrics   ┌────────────┐   /metrics   ┌────────────┐                    Node Exporter          │
+│  │ JobManager │◀────────────│ Prometheus │◀────────────│ TaskManager │          (主机 CPU/内存/磁盘/网络)         │
+│  └────────────┘              └────────────┘              └────────────┘                                       │
+│        ▲                             ▲                             ▲                                           │
+│        │                             │                             │                                           │
+│  ┌────────────┐                      │                      ┌────────────┐                                    │
+│  │  Doris FE  │──────────────────────┘                      │  Doris BE  │                                    │
+│  └────────────┘                                             └────────────┘                                    │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**数据流向（2 条主链路）**：
+**数据流向（4 条路径）**：
 
-1. **业务 CDC 链路**：MySQL (`gmall_base` / `gmall_business`) → Debezium Connect → Flink MySQL CDC → Paimon ODS → Paimon DIM/DWD (Lookup Join 拼宽) → Flink 聚合 → Doris DWS → Doris ADS 视图
-2. **日志流链路**：埋点日志 → Kafka (topic_base_log / topic_action / ...) → Flink Kafka Source → Paimon ODS (Append-Only) → Paimon DWD (炸裂/清洗) → Flink 聚合 → Doris DWS → Doris ADS 视图
+1. **业务 CDC → ODS → DWD → DWS(Stream Load) → ADS**：
+   MySQL (`gmall_base` / `gmall_business`) → Debezium Connect (Kafka topic: `dbserver1.*`) → **Flink MySQL CDC Source** (批+流双模式: `initial` 首次全量 / `latest-offset` 增量) → **Paimon ODS (Changelog 业务层)** → **Flink Streaming ETL** (Lookup Join 拼 Paimon DIM 维度 → 生成 Paimon DWD 事实宽表) → **Flink Doris Sink (Stream Load, FE:8030)** → `dws.trade_user_stats` / `dws.trade_sku_stats` / 日志域 DWS → **Doris ADS 普通视图** → Grafana
+
+2. **Kafka 埋点日志 → ODS → DWD → DWS(Stream Load) → ADS**：
+   埋点 → Kafka (`topic_base_log` / `topic_action` / `topic_start` / `topic_error` / `topic_exposure`) → **Flink Kafka Source** (批+流双模式，Append-Only) → **Paimon ODS (日志 Append 层)** → **Flink Streaming ETL** (炸裂/清洗/拼宽 → Paimon DWD Log 域) → **Flink Doris Sink (Stream Load)** → `dws.log_page_stats` / `dws.log_user_action_stats` / `dws.log_sku_exposure_stats` → ADS → Grafana
+
+3. **Doris 外部表直读 Paimon DWD/ODS → 物化视图 MV → ADS**：
+   Paimon DWD/ODS → **Doris Multi-Catalog (Paimon Catalog)** (FE 直接读 Paimon 表，**无需 Flink 搬运**) → **Doris 物化视图 MV** (DWS 层 6 张: `trade_region_stats_mv` / `trade_coupon_stats_mv` / `gmv_hourly_trend_mv` / `daily_active_users_mv` / `daily_order_users_mv` / `page_transition_stats_mv`，COMPLETE/AUTO 定时刷新) → **ADS 视图** → Grafana
+
+4. **ADS 视图查询时实时聚合**：
+   所有 ADS 层全为 `CREATE VIEW` (零存储)，Grafana 每次查询通过 **MySQL 协议连 Doris FE:9030**，DWS 明细+MV 聚合后即时返回。
 
 ---
 
